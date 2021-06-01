@@ -6,7 +6,7 @@ import torch
 from unityagents import UnityEnvironment
 
 from models.ddpg.agent import Agent
-from utils.config import generate_configuration_ddpg, read_config
+from utils.config import generate_configuration_ddpg, read_hp
 
 
 def test(env, agent, n_ep_train, config, n_episodes=10, sleep_t=0.0):
@@ -45,7 +45,7 @@ if __name__ == '__main__':
     env_info = env.reset(train_mode=True)[brain_name]
     action_size = brain.vector_action_space_size
     state_size = len(env_info.vector_observations[0])
-    config = read_config("configs/reacher_ddpg.yaml")
+    config = read_hp("configs/reacher_ddpg.yaml")
 
     agent = Agent(config)
     agent.load_weights("./checkpoint.pth")

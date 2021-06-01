@@ -1,3 +1,4 @@
+import pickle
 from collections import deque
 
 from unityagents import UnityEnvironment
@@ -7,11 +8,11 @@ import matplotlib.pyplot as plt
 
 from models.ddpg.agent import Agent
 from test import test
-from utils.config import Config, generate_configuration_d4qn, generate_configuration_ddpg, read_config
+from utils.config import read_hp
 
 if __name__ == '__main__':
-    config = read_config("configs/reacher_ddpg.yaml")
-    env = UnityEnvironment(file_name="./Reacher_Linux/Reacher.x86_64")
+    hp = read_hp("configs/reacher_ddpg.yaml")
+    env = UnityEnvironment(file_name=hp['unity_env_path'])
     min_solved = None
     # Get the default brain
     brain_name = env.brain_names[0]
@@ -21,12 +22,13 @@ if __name__ == '__main__':
     test_scores_i = []
     avg_scores = []
     scores_window = deque(maxlen=100)
-    agent = Agent(config)
-    for i_episode in range(1, config['n_episodes'] + 1):
+
+    agent = Agent(hp)
+    for i_episode in range(1, hp['n_episodes'] + 1):
         # Reset the environment and the score
         env_info = env.reset(train_mode=True)[brain_name]
         state = env_info.vector_observations
-        score = np.zeros(config['num_agents'])
+        score = np.zeros(hp['num_agents'])
         while True:
             actions = agent.act(state, add_noise=True)
             env_info = env.step(actions)[brain_name]
@@ -44,7 +46,7 @@ if __name__ == '__main__':
                                                                              np.mean(scores_window)),
             end="")
         if i_episode % 20 == 0:
-            test_scores.append(test(env, agent, i_episode, config))
+            test_scores.append(test(env, agent, i_episode, hp))
             test_scores_i.append(i_episode)
             print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)))
             fig = plt.figure()
@@ -58,11 +60,15 @@ if __name__ == '__main__':
             ax1.plot(test_scores_i, test_scores, label="Test Score")
             plt.show()
             agent.save_weights(i_episode)
+            with open(agent.dir + "scores.txt", "wb") as fp:
+                pickle.dump(scores, fp)
+            with open(agent.dir + "test_scores.txt", "wb") as fp:
+                pickle.dump(test_scores, fp)
+            with open(agent.dir + "avg_scores.txt", "wb") as fp:
+                pickle.dump(avg_scores, fp)
         if min_solved is None or np.mean(scores_window) >= min_solved:
             min_solved = np.mean(scores_window)
             print('\nNew best in {:d} episodes!\tAverage Score: {:.2f}'.format(i_episode,
                                                                                np.mean(scores_window)))
             agent.save_weights(i_episode)
-    df = pd.DataFrame(list(zip(scores, avg_scores)),
-                      columns=['Scores', 'Last100'])
     env.close()
