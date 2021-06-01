@@ -12,6 +12,8 @@ torchaudio = "^0.8.1"
 jupyter = "^1.0.0"
 unityagents = "^0.4.0"
 opencv-python = "^4.5.1"
+tensorboardX = "^1.8"
+imageio = "^2.9.0"
 
 [tool.poetry.dev-dependencies]
 
