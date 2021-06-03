@@ -1,12 +1,10 @@
 from collections import deque
-from time import sleep
 
 import numpy as np
-import torch
 from unityagents import UnityEnvironment
 
 from models.ddpg.agent import Agent
-from utils.config import generate_configuration_ddpg, read_hp
+from utils.config import read_hp
 
 
 def test(env, agent, n_ep_train, config, n_episodes=10, sleep_t=0.0):
@@ -49,4 +47,4 @@ if __name__ == '__main__':
 
     agent = Agent(config)
     agent.load_weights("./checkpoint.pth")
-    print(test(env, agent, 0, n_episodes=100, sleep_t=0))
+    print(test(env, agent, 0, config, n_episodes=100, sleep_t=0))

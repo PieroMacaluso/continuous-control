@@ -34,15 +34,16 @@ class Agent:
         self.update_every = hp['update_every']
         self.target_update_every = hp['target_update_every']
         self.learning_steps = hp['learning_steps']
-        self.gradient_clipping = hp['gradient_clipping']
+        self.gradient_clipping_critic = hp['gradient_clipping_critic']
+        self.gradient_clipping_actor = hp['gradient_clipping_actor']
 
         # Actor networks local and target
-        self.actor_local = Actor(hp['state_size'], hp['action_size'], self.seed, hp['fc_layers']).to(self.device)
-        self.actor_target = Actor(hp['state_size'], hp['action_size'], self.seed, hp['fc_layers']).to(self.device)
+        self.actor_local = Actor(hp['state_size'], hp['action_size'], self.seed, hp['actor_layers']).to(self.device)
+        self.actor_target = Actor(hp['state_size'], hp['action_size'], self.seed, hp['actor_layers']).to(self.device)
         self.actor_optimizer = optim.Adam(self.actor_local.parameters(), lr=hp['actor_lr'])
 
-        self.critic_local = Critic(hp['state_size'], hp['action_size'], self.seed, hp['fc_layers']).to(self.device)
-        self.critic_target = Critic(hp['state_size'], hp['action_size'], self.seed, hp['fc_layers']).to(self.device)
+        self.critic_local = Critic(hp['state_size'], hp['action_size'], self.seed, hp['critic_layers']).to(self.device)
+        self.critic_target = Critic(hp['state_size'], hp['action_size'], self.seed, hp['critic_layers']).to(self.device)
         self.critic_optimizer = optim.Adam(self.critic_local.parameters(), lr=hp['critic_lr'])
 
         self.noise = OUNoise((self.n_agents, hp['action_size']), self.seed)
@@ -58,9 +59,12 @@ class Agent:
         if not os.path.exists(self.checkpoint):
             os.makedirs(self.checkpoint)
         # for learn every update step
-        self.t_step = 0
+        self.steps = 0
+        self.t_steps = 0
+        self.actor_loss = 0.0
+        self.critic_loss = 0.0
 
-    def act(self, state, add_noise=True):
+    def act(self, state, add_noise=True, damping_noise=1.0):
 
         state = torch.from_numpy(state).float().to(self.device)  # convert state from numpy array to a tensor
         self.actor_local.eval()
@@ -68,20 +72,24 @@ class Agent:
             action = self.actor_local(state).cpu().data.numpy()
         self.actor_local.train()
         if add_noise:
-            action += self.noise.sample()
+            action += self.noise.sample() * damping_noise
             action = np.clip(action, self.action_min, self.action_max)
         return action
 
     def step(self, state, action, reward, next_state, done):
         for i in range(self.n_agents):
             self.memory.add(state[i, :], action[i, :], reward[i], next_state[i, :], done[i])
-        self.t_step += 1
+        self.steps += 1
 
         if len(self.memory) > self.batch_size * self.n_agents:
-            if self.t_step % self.update_every == 0:
-                for _ in self.learning_steps:
+            if self.steps % self.update_every == 0:
+                for _ in range(self.learning_steps):
                     experiences = self.memory.sample()
                     self.learn(experiences, self.gamma)
+
+            if self.t_steps % self.target_update_every == 0:
+                self.soft_update(self.actor_local, self.actor_target, self.tau)
+                self.soft_update(self.critic_local, self.critic_target, self.tau)
 
     def learn(self, experiences, gamma):
 
@@ -99,7 +107,7 @@ class Agent:
         # Minimize the loss
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
-        if self.gradient_clipping:
+        if self.gradient_clipping_critic:
             torch.nn.utils.clip_grad_norm_(self.critic_local.parameters(), 1)
         self.critic_optimizer.step()
 
@@ -111,11 +119,13 @@ class Agent:
         # Minimize the loss
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
-        if self.gradient_clipping:
+        if self.gradient_clipping_actor:
             torch.nn.utils.clip_grad_norm_(self.actor_local.parameters(), 1)
         self.actor_optimizer.step()
-
-        if self.t_step % self.target_update_every == 0:
+        self.t_steps += 1
+        self.actor_loss = actor_loss.data
+        self.critic_loss = critic_loss.data
+        if self.t_steps % self.target_update_every == 0:
             self.soft_update(self.actor_local, self.actor_target, self.tau)
             self.soft_update(self.critic_local, self.critic_target, self.tau)
 
