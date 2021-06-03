@@ -66,3 +66,7 @@ The code will start to create checkpoints in the appropriate folder.
 The best parameters of the network found in the training are available in the file [checkpoint.pth](chackpoint.pth) in the root folder of this repository.
 
 In order to test the network it is possible to go to the root folder and run `python test.py`
+
+## Result Show Case
+
+![Solution](stuff/solved_gif.gif)
